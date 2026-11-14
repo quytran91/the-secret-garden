@@ -109,7 +109,22 @@ export type Prepared =
   | { ok: false; reason: FailReason }
 
 /** Chuẩn bị một file để lưu. Không ghi DB — việc đó nằm ở tầng store. */
-export async function prepareFile(file: File, isDuplicate: (hash: string) => Promise<boolean>): Promise<Prepared> {
+/** Tên file do máy tự sinh (mã UUID của iPhone, IMG_1234, ảnh chụp màn hình…) không có ý nghĩa với người dùng */
+export function isMachineName(name: string): boolean {
+  const n = name.trim()
+  return (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(n) ||
+    /^(img|image|photo|pxl|dsc|dscn|dcim|mvimg|screenshot|ảnh)[ _-]?\d/i.test(n) ||
+    /^\d{6,}([_-]\d+)*$/.test(n) ||
+    n === ''
+  )
+}
+
+export async function prepareFile(
+  file: File,
+  isDuplicate: (hash: string) => Promise<boolean>,
+  fallbackName = 'Thông điệp',
+): Promise<Prepared> {
   const kind = detectKind(file)
   if (kind !== 'ok') return { ok: false, reason: kind }
   if (file.size > MAX_BYTES) return { ok: false, reason: 'tooLarge' }
@@ -132,7 +147,8 @@ export async function prepareFile(file: File, isDuplicate: (hash: string) => Pro
   }
   try {
     const thumb = await makeThumb(decoded)
-    const name = file.name.replace(/\.[^.]+$/, '').trim() || 'Thông điệp'
+    const base = file.name.replace(/\.[^.]+$/, '').trim()
+    const name = isMachineName(base) ? fallbackName : base
     const meta: ImageMeta = {
       id: uid(),
       name,

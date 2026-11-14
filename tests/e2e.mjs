@@ -302,6 +302,12 @@ await page.evaluate(() => [...document.querySelectorAll('.result-actions button'
 await page.waitForSelector('.viewer-img')
 await sleep(400)
 await shot('11-viewer')
+const vr = await page.evaluate(() => {
+  const a = document.querySelector('.viewer-img').getBoundingClientRect()
+  const b = document.querySelector('.viewer-stage').getBoundingClientRect()
+  return Math.abs(a.left - b.left) + Math.abs(a.top - b.top) + Math.abs(a.width - b.width) + Math.abs(a.height - b.height)
+})
+ok('Viewer: ảnh nằm gọn giữa khung, không tràn', vr < 2, `lệch ${vr.toFixed(1)}px`)
 await page.keyboard.press('+')
 await sleep(400)
 const zoomed = await page.$eval('.viewer-img', (i) => i.style.transform)

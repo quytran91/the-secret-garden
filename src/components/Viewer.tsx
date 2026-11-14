@@ -38,8 +38,11 @@ export function Viewer({ id, onClose }: { id: string; onClose: () => void }) {
     // Giới hạn kéo để ảnh không trôi khỏi khung
     const bw = box.clientWidth
     const bh = box.clientHeight
-    const iw = el.clientWidth * v.s
-    const ih = el.clientHeight * v.s
+    const nw = el.naturalWidth || bw
+    const nh = el.naturalHeight || bh
+    const fit = Math.min(bw / nw, bh / nh)
+    const iw = nw * fit * v.s
+    const ih = nh * fit * v.s
     const mx = Math.max(0, (iw - bw) / 2)
     const my = Math.max(0, (ih - bh) / 2)
     v.x = Math.min(mx, Math.max(-mx, v.x))
@@ -184,7 +187,10 @@ export function Viewer({ id, onClose }: { id: string; onClose: () => void }) {
         {url && <img ref={img} src={url} alt={meta?.name ?? ''} draggable={false} className="viewer-img" />}
         {error && <p className="muted">Không mở được ảnh này.</p>}
       </div>
-      <p className="viewer-hint small muted">Chụm hai ngón hoặc lăn chuột để phóng to · chạm đúp để phóng nhanh</p>
+      <p className="viewer-hint small muted">
+        <span className="desktop-only">Lăn chuột để phóng to · nhấp đúp để phóng nhanh · Esc để đóng</span>
+        <span className="touch-only">Chụm hai ngón để phóng to · chạm đúp để phóng nhanh</span>
+      </p>
     </div>
   )
 }

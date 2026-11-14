@@ -13,6 +13,7 @@ import {
   startNewRound,
 } from './bag'
 import { cryptoRng, uid, type Rng } from './random'
+import { isMachineName } from './importer'
 import {
   DEFAULT_SETTINGS,
   type BagState,
@@ -90,6 +91,13 @@ export async function loadSnapshot(db: GardenDB, rng: Rng = cryptoRng): Promise<
   const storedBag = (await kv.get('bag')) as BagState | undefined
   const storedSettings = (await kv.get('settings')) as Partial<Settings> | undefined
   let current = ((await kv.get('current')) as CurrentDraw | undefined) ?? null
+  images.sort((a, b) => a.createdAt - b.createdAt)
+  for (let i = 0; i < images.length; i++) {
+    if (isMachineName(images[i].name)) {
+      images[i] = { ...images[i], name: `Thông điệp ${i + 1}` }
+      await tx.objectStore('images').put(images[i])
+    }
+  }
   const ids = images.map((i) => i.id)
   const bag = reconcileBag(storedBag, ids, rng)
   await kv.put(bag, 'bag')

@@ -66,6 +66,7 @@ export function GardenProvider({ children }: { children: ReactNode }) {
   const [historyVersion, setHistoryVersion] = useState(0)
   const dbRef = useRef<store.GardenDB | null>(null)
   const importing = useRef(false)
+  const queue = useRef<File[]>([])
 
   const toast = useCallback((text: string, tone: Toast['tone'] = 'info') => {
     const id = Date.now() + Math.random()
@@ -94,20 +95,33 @@ export function GardenProvider({ children }: { children: ReactNode }) {
     async (files: File[]) => {
       if (!files.length) return
       if (importing.current) {
-        toast('Đang nhập ảnh, vui lòng đợi lượt hiện tại xong.')
+        // Đang nhập dở: xếp hàng, không bỏ ảnh nào
+        queue.current.push(...files)
+        setImportJob((j) => (j ? { ...j, total: j.total + files.length } : j))
         return
       }
       importing.current = true
+      files = [...files]
       const d = await db()
       const job: ImportJob = { running: true, total: files.length, done: 0, added: 0, failures: [] }
       setImportJob({ ...job })
       let quotaHit = false
-      for (const file of files) {
+      let seq = (await store.loadSnapshot(d)).images.length
+      for (let k = 0; k < files.length || queue.current.length; k++) {
+        if (k >= files.length) {
+          files.push(...queue.current.splice(0))
+          job.total = files.length
+        }
+        const file = files[k]
         if (quotaHit) {
           job.failures.push({ name: file.name, reason: 'quota' })
         } else {
           try {
-            const prepared = await prepareFile(file, async (h) => !!(await store.findByHash(d, h)))
+            const prepared = await prepareFile(
+              file,
+              async (h) => !!(await store.findByHash(d, h)),
+              `Thông điệp ${seq + 1}`,
+            )
             if (!prepared.ok) {
               job.failures.push({ name: file.name, reason: prepared.reason })
             } else {
@@ -115,6 +129,7 @@ export function GardenProvider({ children }: { children: ReactNode }) {
               if (r.status === 'duplicate') job.failures.push({ name: file.name, reason: 'duplicate' })
               else {
                 job.added++
+                seq++
                 setState((s) => ({ ...s, images: [...s.images, r.meta] }))
               }
             }
