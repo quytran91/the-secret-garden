@@ -1,0 +1,7 @@
+node_modules
+dist
+*.log
+.DS_Store
+# Không bao giờ đưa ảnh cá nhân vào repo
+my-photos/
+private/
