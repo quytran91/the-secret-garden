@@ -3,6 +3,7 @@ import * as store from '../lib/db'
 import { prepareFile, type FailReason } from '../lib/importer'
 import type { BagState, CurrentDraw, ImageMeta, Settings } from '../lib/types'
 import { DEFAULT_SETTINGS } from '../lib/types'
+import { levelFor } from '../lib/level'
 
 export interface ImportJob {
   running: boolean
@@ -15,7 +16,7 @@ export interface ImportJob {
 export interface Toast {
   id: number
   text: string
-  tone: 'info' | 'error'
+  tone: 'info' | 'error' | 'level'
 }
 
 interface GardenState {
@@ -24,6 +25,7 @@ interface GardenState {
   bag: BagState | null
   settings: Settings
   current: CurrentDraw | null
+  received: number
 }
 
 interface GardenApi extends GardenState {
@@ -60,6 +62,7 @@ export function GardenProvider({ children }: { children: ReactNode }) {
     bag: null,
     settings: DEFAULT_SETTINGS,
     current: null,
+    received: 0,
   })
   const [importJob, setImportJob] = useState<ImportJob | null>(null)
   const [toasts, setToasts] = useState<Toast[]>([])
@@ -209,8 +212,15 @@ export function GardenProvider({ children }: { children: ReactNode }) {
         return r
       },
       async markRevealed(drawId) {
-        await store.markRevealed(await db(), drawId)
-        setState((s) => (s.current?.drawId === drawId ? { ...s, current: { ...s.current, revealed: true } } : s))
+        const before = levelFor(state.received).level
+        const received = await store.markRevealed(await db(), drawId)
+        setState((s) => ({
+          ...s,
+          received,
+          current: s.current?.drawId === drawId ? { ...s.current, revealed: true } : s.current,
+        }))
+        const after = levelFor(received)
+        if (after.level > before) toast(`Lên cấp LV.${after.level} · ${after.title}!`, 'level')
       },
       async rollback(drawId) {
         const bag = await store.rollbackDraw(await db(), drawId)

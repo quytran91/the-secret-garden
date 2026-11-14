@@ -17,6 +17,7 @@ import {
 import { EmptyCard } from './EmptyCard'
 import { IconExpand, IconHeart, IconPlus } from './Icons'
 import { PixelDiamond, PixelSpark } from './Pixel'
+import { levelFor } from '../lib/level'
 
 type Phase = 'idle' | 'drawing' | 'revealed'
 
@@ -403,14 +404,7 @@ export function Home({ reduced, onAddImages, onOpenViewer }: Props) {
 
   const showComplete = roundComplete && phase === 'idle'
 
-  const progress = useMemo(() => {
-    if (settings.mode === 'free') return { text: `Ngẫu nhiên tự do · ${count} thông điệp`, ratio: null as number | null }
-    if (!bag) return { text: '', ratio: 0 }
-    const opened = bag.drawn.length
-    const total = opened + bag.remaining.length
-    const round = bag.round > 1 ? ` · vòng ${bag.round}` : ''
-    return { text: `Đã mở ${opened} / ${total} thông điệp${round}`, ratio: total ? opened / total : 0 }
-  }, [settings.mode, bag, count])
+  const lv = useMemo(() => levelFor(g.received), [g.received])
 
   const intro = (lead: string) => (
     <div className="board-intro">
@@ -549,13 +543,20 @@ export function Home({ reduced, onAddImages, onOpenViewer }: Props) {
         </div>
 
         <div className="controls">
-          <div className="progress-row">
-            <p className="count-line">{progress.text}</p>
-            {progress.ratio !== null && (
-              <div className="pixel-bar" aria-hidden="true">
-                <span style={{ transform: `scaleX(${progress.ratio})` }} />
-              </div>
-            )}
+          <div className="level-bar" aria-label={`Cấp ${lv.level}, ${lv.title}. Đã đón nhận ${lv.received} thông điệp, còn ${lv.need - lv.inLevel} để lên cấp ${lv.level + 1}.`} role="group">
+            <div className="level-top" aria-hidden="true">
+              <span className="level-badge">LV.{lv.level}</span>
+              <span className="level-title">{lv.title}</span>
+              <span className="level-total">
+                <PixelDiamond size={16} /> {lv.received}
+              </span>
+            </div>
+            <div className="pixel-bar" aria-hidden="true">
+              <span style={{ transform: `scaleX(${lv.inLevel / lv.need})` }} />
+            </div>
+            <p className="level-hint" aria-hidden="true">
+              Còn {lv.need - lv.inLevel} thông điệp để lên LV.{lv.level + 1}
+            </p>
           </div>
           {revealed ? (
             <>

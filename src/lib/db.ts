@@ -81,13 +81,24 @@ export interface Snapshot {
   bag: BagState
   settings: Settings
   current: CurrentDraw | null
+  /** Tổng số thông điệp đã đón nhận — không giảm khi xoá ảnh */
+  received: number
 }
 
 /** Đọc toàn bộ trạng thái (trừ ảnh), đồng thời sửa các tham chiếu hỏng. */
 export async function loadSnapshot(db: GardenDB, rng: Rng = cryptoRng): Promise<Snapshot> {
-  const tx = db.transaction(['images', 'kv'], 'readwrite')
+  const tx = db.transaction(['images', 'kv', 'history'], 'readwrite')
   const images = await tx.objectStore('images').getAll()
   const kv = tx.objectStore('kv')
+  // Tổng số thông điệp đã đón nhận (cho cấp độ). Lần đầu: lấy theo lịch sử hiện có.
+  let received = (await kv.get('received')) as number | undefined
+  if (typeof received !== 'number') {
+    const pending = (await kv.get('current')) as CurrentDraw | undefined
+    const total = await tx.objectStore('history').count()
+    // Lượt đang bốc dở (chưa hiện rõ) chưa được tính
+    received = Math.max(0, total - (pending && !pending.revealed ? 1 : 0))
+    await kv.put(received, 'received')
+  }
   const storedBag = (await kv.get('bag')) as BagState | undefined
   const storedSettings = (await kv.get('settings')) as Partial<Settings> | undefined
   let current = ((await kv.get('current')) as CurrentDraw | undefined) ?? null
@@ -107,7 +118,7 @@ export async function loadSnapshot(db: GardenDB, rng: Rng = cryptoRng): Promise<
   }
   await tx.done
   images.sort((a, b) => a.createdAt - b.createdAt)
-  return { images, bag, settings: { ...DEFAULT_SETTINGS, ...storedSettings }, current }
+  return { images, bag, settings: { ...DEFAULT_SETTINGS, ...storedSettings }, current, received }
 }
 
 export type AddResult =
@@ -238,11 +249,18 @@ export async function commitDraw(db: GardenDB, mode: DrawMode, rng: Rng = crypto
   return { status: 'ok', current, bag }
 }
 
-export async function markRevealed(db: GardenDB, drawId: string) {
+/** Đánh dấu lượt đã hiện rõ và cộng 1 thông điệp — chỉ một lần cho mỗi lượt. Trả về tổng mới. */
+export async function markRevealed(db: GardenDB, drawId: string): Promise<number> {
   const tx = db.transaction('kv', 'readwrite')
   const cur = (await tx.store.get('current')) as CurrentDraw | undefined
-  if (cur && cur.drawId === drawId && !cur.revealed) await tx.store.put({ ...cur, revealed: true }, 'current')
+  let received = ((await tx.store.get('received')) as number | undefined) ?? 0
+  if (cur && cur.drawId === drawId && !cur.revealed) {
+    await tx.store.put({ ...cur, revealed: true }, 'current')
+    received += 1
+    await tx.store.put(received, 'received')
+  }
   await tx.done
+  return received
 }
 
 /** Hoàn tác lượt bốc khi ảnh không mở được: trả túi và xoá lịch sử của lượt đó. */

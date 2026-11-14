@@ -781,10 +781,56 @@ img {
 .controls > p {
   margin: 0;
 }
-.progress-row {
+/* Thanh cấp độ: LV + danh hiệu + tổng thông điệp đã đón nhận */
+.level-bar {
   width: 100%;
   display: grid;
   gap: 6px;
+  padding: 10px 12px 8px;
+  border-radius: 14px;
+  background: var(--white);
+  border: 3px solid var(--brown);
+  box-shadow: 0 4px 0 var(--brown);
+}
+.level-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.level-badge {
+  flex: none;
+  font-family: var(--display);
+  font-size: 13px;
+  line-height: 1;
+  color: var(--gold-light);
+  background: var(--brown);
+  border-radius: 8px;
+  padding: 6px 8px 5px;
+}
+.level-title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  font-size: 14.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.level-total {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--display);
+  font-size: 14px;
+  color: var(--sapphire);
+}
+.level-hint {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-2);
 }
 .count-line {
   margin: 0;
@@ -1662,6 +1708,13 @@ img {
   border: 3px solid var(--brown);
   box-shadow: 0 4px 0 var(--brown);
   animation: rise 320ms var(--ease) both;
+}
+.toast-level {
+  font-family: var(--display);
+  font-weight: 400;
+  text-align: center;
+  color: var(--brown);
+  background: linear-gradient(180deg, #ffe680 0%, var(--gold) 100%);
 }
 .toast-error {
   background: #ffe3ec;

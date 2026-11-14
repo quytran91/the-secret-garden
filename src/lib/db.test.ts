@@ -70,10 +70,13 @@ describe('lưu trữ IndexedDB', () => {
     const snap = await loadSnapshot(db)
     expect(snap.current?.drawId).toBe(r.current.drawId)
     expect(snap.current?.revealed).toBe(false)
-    await markRevealed(db, r.current.drawId)
-    await markRevealed(db, r.current.drawId)
+    expect(snap.received).toBe(0)
+    expect(await markRevealed(db, r.current.drawId)).toBe(1)
+    expect(await markRevealed(db, r.current.drawId)).toBe(1)
     expect((await listHistory(db)).length).toBe(1)
     expect((await loadSnapshot(db)).current?.revealed).toBe(true)
+    await deleteImage(db, r.current.imageId)
+    expect((await loadSnapshot(db)).received).toBe(1)
   })
 
   it('hoàn tác khi ảnh lỗi: trả ảnh về túi, xoá lịch sử', async () => {

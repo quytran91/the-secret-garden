@@ -190,8 +190,9 @@ await shot('02-import-progress')
 await closeSheet()
 
 await page.reload({ waitUntil: 'networkidle0' })
-await page.waitForSelector('.count-line')
-ok('Reload: ảnh vẫn còn', (await state()).images === 6 && (await page.$eval('.count-line', (e) => e.innerText)).includes('Đã mở 0 / 6 thông điệp'))
+await page.waitForSelector('.level-bar')
+ok('Reload: ảnh vẫn còn', (await state()).images === 6)
+ok('Thanh cấp độ bắt đầu ở LV.1', (await page.$eval('.level-bar', (e) => e.innerText)).includes('LV.1'))
 await sleep(400)
 await shot('03-idle-mobile')
 
@@ -208,7 +209,7 @@ await sleep(300)
 await shot('05-revealed')
 const first = await state()
 ok('Hiện nhãn "Món quà dành cho bạn" khi mở', (await page.$eval('.ribbon', (e) => e.textContent)) === 'Món quà dành cho bạn')
-ok('Tiến độ lấy từ dữ liệu thật', (await page.$eval('.count-line', (e) => e.innerText)).includes('Đã mở 1 / 6 thông điệp'))
+ok('Thanh cấp độ cộng 1 sau khi mở', (await page.$eval('.level-total', (e) => e.innerText.trim())) === '1')
 
 // Bốc hết vòng
 const names = [first.lockedName]
@@ -232,7 +233,9 @@ ok('Hết vòng: hiện lời chúc và "Bắt đầu vòng mới"', (await page
 await shot('06-round-complete')
 ;(await cta()).click()
 await sleep(400)
-ok('Vòng mới đủ 6 ảnh', (await page.$eval('.count-line', (e) => e.innerText)).includes('Đã mở 0 / 6 thông điệp · vòng 2'))
+const nr = (await state()).bag
+ok('Vòng mới đủ 6 ảnh', nr.round === 2 && nr.remaining.length === 6)
+ok('Lên cấp sau 6 thông điệp (LV.2)', (await page.$eval('.level-badge', (e) => e.innerText)) === 'LV.2', await page.$eval('.level-bar', (e) => e.innerText.split('\n').join(' ')))
 
 // Bấm liên tục
 const h0 = (await state()).history
