@@ -2,11 +2,13 @@ import { useEffect, useRef } from 'react'
 import { useBlobUrl } from '../hooks'
 import { useGarden } from '../store/garden'
 import { IconClose, IconHeart, IconZoomIn, IconZoomOut } from './Icons'
+import { burstAt, riseFromCorner } from './fx'
+import { haptic } from '../lib/feedback'
 
 const MIN = 1
 const MAX = 6
 
-/** Xem lớn: chụm hai ngón / lăn chuột để phóng, kéo để di chuyển, chạm đúp để phóng nhanh. */
+/** Xem lớn: chụm hai ngón / lăn chuột để phóng, kéo để di chuyển, chạm vào ảnh để thả tim. */
 export function Viewer({ id, onClose }: { id: string; onClose: () => void }) {
   const g = useGarden()
   const meta = g.imageById.get(id)
@@ -17,7 +19,9 @@ export function Viewer({ id, onClose }: { id: string; onClose: () => void }) {
   const t = useRef({ s: 1, x: 0, y: 0 })
   const pointers = useRef(new Map<number, { x: number; y: number }>())
   const gesture = useRef<{ dist: number; s: number; cx: number; cy: number; x: number; y: number } | null>(null)
-  const lastTap = useRef(0)
+  const fx = useRef<HTMLDivElement>(null)
+  /** Theo dõi một lần chạm: chỉ tính là "chạm" nếu không kéo, không chụm và nhả nhanh */
+  const tap = useRef<{ id: number; x: number; y: number; t: number; multi: boolean } | null>(null)
 
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null
@@ -88,12 +92,22 @@ export function Viewer({ id, onClose }: { id: string; onClose: () => void }) {
       }
     }
     if (pointers.current.size === 1) {
-      const now = performance.now()
-      if (now - lastTap.current < 280) {
-        zoomAt(t.current.s > 1 ? 1 : 2.5, e.clientX, e.clientY, true)
-        lastTap.current = 0
-      } else lastTap.current = now
+      tap.current = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), multi: false }
+    } else if (tap.current) {
+      tap.current.multi = true
     }
+  }
+
+  /** Chạm vào ảnh: thả tim bay tung toé, lần đầu thì đánh dấu Yêu thích */
+  const heartAt = (clientX: number, clientY: number) => {
+    const layer = fx.current
+    if (!layer) return
+    const r = layer.getBoundingClientRect()
+    const reduced = document.documentElement.classList.contains('reduce-motion')
+    burstAt(layer, clientX - r.left, clientY - r.top, reduced)
+    riseFromCorner(layer, 3, reduced)
+    if (meta && !meta.favorite) void g.toggleFavorite(id)
+    if (g.settings.haptics) haptic(8)
   }
 
   const onPointerMove = (e: React.PointerEvent) => {
@@ -117,6 +131,19 @@ export function Viewer({ id, onClose }: { id: string; onClose: () => void }) {
   }
 
   const onPointerUp = (e: React.PointerEvent) => {
+    const tp = tap.current
+    if (
+      e.type === 'pointerup' &&
+      tp &&
+      tp.id === e.pointerId &&
+      !tp.multi &&
+      pointers.current.size === 1 &&
+      performance.now() - tp.t < 400 &&
+      Math.hypot(e.clientX - tp.x, e.clientY - tp.y) < 10
+    ) {
+      heartAt(e.clientX, e.clientY)
+    }
+    if (tp?.id === e.pointerId) tap.current = null
     pointers.current.delete(e.pointerId)
     if (pointers.current.size < 2) gesture.current = null
     if (t.current.s < 1.02) {
@@ -129,7 +156,7 @@ export function Viewer({ id, onClose }: { id: string; onClose: () => void }) {
     zoomAt(t.current.s * Math.exp(-e.deltaY * 0.0022), e.clientX, e.clientY)
   }
 
-  const onKey = (e: React.KeyboardEvent) => {
+  const onKey = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       e.stopPropagation()
       onClose()
@@ -149,8 +176,17 @@ export function Viewer({ id, onClose }: { id: string; onClose: () => void }) {
     }
   }
 
+  // Phím tắt nghe trên cả cửa sổ: chạm/nhấp vào ảnh làm mất focus nhưng Esc vẫn phải đóng được
+  const keyRef = useRef(onKey)
+  keyRef.current = onKey
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => keyRef.current(e)
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [])
+
   return (
-    <div className="viewer" role="dialog" aria-modal="true" aria-label={`Xem lớn: ${meta?.name ?? 'ảnh'}`} onKeyDown={onKey}>
+    <div className="viewer" role="dialog" aria-modal="true" aria-label={`Xem lớn: ${meta?.name ?? 'ảnh'}`}>
       <div className="viewer-top">
         <span className="viewer-name">{meta?.name}</span>
         <div className="viewer-tools">
@@ -187,9 +223,10 @@ export function Viewer({ id, onClose }: { id: string; onClose: () => void }) {
         {url && <img ref={img} src={url} alt={meta?.name ?? ''} draggable={false} className="viewer-img" />}
         {error && <p className="muted">Không mở được ảnh này.</p>}
       </div>
+      <div ref={fx} className="fx-layer" aria-hidden="true" />
       <p className="viewer-hint small muted">
-        <span className="desktop-only">Lăn chuột để phóng to · nhấp đúp để phóng nhanh · Esc để đóng</span>
-        <span className="touch-only">Chụm hai ngón để phóng to · chạm đúp để phóng nhanh</span>
+        <span className="desktop-only">Nhấp vào ảnh để thả tim · lăn chuột để phóng to · Esc để đóng</span>
+        <span className="touch-only">Chạm vào ảnh để thả tim · chụm hai ngón để phóng to</span>
       </p>
     </div>
   )

@@ -313,6 +313,35 @@ const vr = await page.evaluate(() => {
   return Math.abs(a.left - b.left) + Math.abs(a.top - b.top) + Math.abs(a.width - b.width) + Math.abs(a.height - b.height)
 })
 ok('Viewer: ảnh nằm gọn giữa khung, không tràn', vr < 2, `lệch ${vr.toFixed(1)}px`)
+// Chạm vào ảnh: thả tim bay tung toé + đánh dấu Yêu thích
+const favBefore = await idb(async (req) => {
+  const cur = await req('kv', 'get', 'current')
+  return (await req('images', 'get', cur.imageId)).favorite
+})
+const stageBox = await (await page.$('.viewer-stage')).boundingBox()
+const cx = stageBox.x + stageBox.width / 2
+const cy = stageBox.y + stageBox.height / 2
+await page.mouse.click(cx, cy)
+await sleep(60)
+await page.mouse.click(cx + 40, cy + 30)
+await sleep(220)
+const fxCount = await page.$$eval('.fx-emoji', (els) => els.length)
+await shot('11b-hearts')
+const favAfter = await idb(async (req) => {
+  const cur = await req('kv', 'get', 'current')
+  return (await req('images', 'get', cur.imageId)).favorite
+})
+ok('Chạm vào ảnh: emoji bay tung toé', fxCount >= 15, `${fxCount} emoji`)
+ok('Chạm vào ảnh: tự đánh dấu Yêu thích', favBefore === false && favAfter === true)
+await sleep(2800)
+ok('Emoji tự dọn sau khi bay xong', (await page.$$eval('.fx-emoji', (els) => els.length)) === 0)
+// Kéo (không phải chạm) thì không thả tim
+await page.mouse.move(cx, cy)
+await page.mouse.down()
+await page.mouse.move(cx + 60, cy + 40, { steps: 5 })
+await page.mouse.up()
+await sleep(150)
+ok('Kéo ảnh không thả tim', (await page.$$eval('.fx-emoji', (els) => els.length)) === 0)
 await page.keyboard.press('+')
 await sleep(400)
 const zoomed = await page.$eval('.viewer-img', (i) => i.style.transform)

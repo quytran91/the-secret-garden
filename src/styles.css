@@ -1768,3 +1768,20 @@ img {
 .reduce-motion .toast {
   animation-duration: 160ms;
 }
+
+/* ============ Thả tim: emoji bay tung toé ============ */
+.fx-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 3;
+}
+.fx-emoji {
+  position: absolute;
+  line-height: 1;
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  will-change: transform, opacity;
+  user-select: none;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+}
