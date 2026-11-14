@@ -333,6 +333,15 @@ const rm = await drawOnce('reduced')
 ok('prefers-reduced-motion: chuyển cảnh ngắn, không carousel', rm.ms < 1600 && rm.shown === rm.locked, `${rm.ms} ms`)
 await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }])
 
+// Nạp nhiều ảnh một lần (không giới hạn số lượng), có cả ảnh cỡ 48MP như iPhone đời mới
+const imgsBefore = (await state()).images
+const many = Array.from({ length: 30 }, (_, i) => (i < 2 ? [8064, 6048, `Lớn ${i + 1}`, i * 11] : [1080, 1350, `Lô ${i + 1}`, i * 11]))
+await dropPosters(many)
+await page.waitForFunction(() => document.querySelector('.import-progress')?.innerText.includes('Đã nhập xong'), { timeout: 120000 })
+const manyText = await page.$eval('.import-progress', (e) => e.innerText)
+ok('Nạp 30 ảnh một lần (có 2 ảnh 48MP) đều thành công', manyText.includes('30 ảnh nhập thành công') && (await state()).images === imgsBefore + 30, manyText.split('\n').slice(0, 3).join(' · '))
+await closeSheet()
+
 // Layout 360px và desktop
 await page.setViewport({ width: 360, height: 740, deviceScaleFactor: 2, isMobile: true, hasTouch: true })
 await page.reload({ waitUntil: 'networkidle0' })

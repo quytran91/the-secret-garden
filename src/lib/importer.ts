@@ -14,7 +14,7 @@ export type FailReason = 'heic' | 'unsupported' | 'corrupt' | 'tooLarge' | 'quot
 export const REASON_TEXT: Record<FailReason, string> = {
   heic: 'Định dạng HEIC chưa được hỗ trợ — hãy đổi sang JPEG rồi nhập lại.',
   unsupported: 'Định dạng không hỗ trợ. Chỉ nhận JPEG, PNG hoặc WebP.',
-  corrupt: 'File bị hỏng hoặc không đọc được.',
+  corrupt: 'Không đọc được ảnh này (file hỏng, hoặc ảnh quá lớn với trình duyệt). Thử xuất lại ảnh rồi nạp lại.',
   tooLarge: 'Ảnh lớn hơn 40 MB.',
   quota: 'Bộ nhớ trình duyệt đã đầy.',
   duplicate: 'Ảnh này đã có trong bộ sưu tập.',
@@ -59,26 +59,34 @@ interface Decoded {
   close: () => void
 }
 
+/**
+ * Giải mã ảnh. Ưu tiên thẻ <img>: Safari/iPhone giải mã ảnh rất lớn (48MP) theo cách tiết kiệm
+ * bộ nhớ hơn createImageBitmap — tránh lỗi hết bộ nhớ khi nạp nhiều ảnh cùng lúc.
+ */
 export async function decodeBlob(blob: Blob): Promise<Decoded> {
-  if (typeof createImageBitmap === 'function') {
+  if (typeof Image !== 'undefined') {
+    const url = URL.createObjectURL(blob)
     try {
-      const bmp = await createImageBitmap(blob)
-      return { source: bmp, width: bmp.width, height: bmp.height, close: () => bmp.close() }
+      const img = new Image()
+      img.decoding = 'async'
+      img.src = url
+      await img.decode()
+      if (!img.naturalWidth) throw new Error('empty')
+      return {
+        source: img,
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+        close: () => {
+          URL.revokeObjectURL(url)
+          img.removeAttribute('src')
+        },
+      }
     } catch {
-      /* thử cách dự phòng */
+      URL.revokeObjectURL(url)
     }
   }
-  const url = URL.createObjectURL(blob)
-  try {
-    const img = new Image()
-    img.decoding = 'async'
-    img.src = url
-    await img.decode()
-    if (!img.naturalWidth) throw new Error('empty')
-    return { source: img, width: img.naturalWidth, height: img.naturalHeight, close: () => undefined }
-  } finally {
-    URL.revokeObjectURL(url)
-  }
+  const bmp = await createImageBitmap(blob)
+  return { source: bmp, width: bmp.width, height: bmp.height, close: () => bmp.close() }
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob> {
