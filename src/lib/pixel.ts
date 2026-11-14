@@ -99,14 +99,25 @@ export function paintMosaic(canvas: HTMLCanvasElement, img: Mosaicable, { cols, 
   if (!ctx) return
   const W = canvas.width
   const H = canvas.height
-  ctx.fillStyle = '#0d1311'
+  ctx.fillStyle = PORTAL
   ctx.fillRect(0, 0, W, H)
   blit(ctx, img, fitRect(img.width, img.height, W, H, 'cover'), 5)
-  ctx.fillStyle = 'rgba(8, 11, 10, 0.66)'
+  ctx.fillStyle = 'rgba(10, 24, 66, 0.62)'
   ctx.fillRect(0, 0, W, H)
   if (cols > 0) blit(ctx, img, fitRect(img.width, img.height, W, H, 'contain'), cols)
   if (dim > 0) {
-    ctx.fillStyle = `rgba(8, 11, 10, ${dim})`
+    ctx.fillStyle = `rgba(10, 24, 66, ${dim})`
     ctx.fillRect(0, 0, W, H)
   }
+}
+
+/** Màu nền cổng kho báu phía sau ảnh */
+const PORTAL = '#13306E'
+
+/** Nền trơn sau khi ảnh đã mở — ảnh gốc giữ nguyên, không pixel hoá */
+export function paintPlain(canvas: HTMLCanvasElement) {
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.fillStyle = PORTAL
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
 }

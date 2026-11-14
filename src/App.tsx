@@ -7,7 +7,9 @@ import { History } from './components/History'
 import { SettingsSheet } from './components/SettingsSheet'
 import { Viewer } from './components/Viewer'
 import { Confirm, type ConfirmRequest } from './components/Confirm'
-import { Sigil } from './components/Icons'
+import { IconMute, IconSound } from './components/Icons'
+import { PixelCloud, PixelDiamond, PixelPalm } from './components/Pixel'
+import { chime, unlockAudio } from './lib/feedback'
 
 type Panel = 'collection' | 'history' | 'settings' | null
 
@@ -84,36 +86,48 @@ function Shell() {
   // Phải gọi trực tiếp trong sự kiện chạm để iOS cho mở trình chọn ảnh
   const pickFiles = () => fileInput.current?.click()
 
-  const nav: [Exclude<Panel, null>, string][] = [
-    ['collection', 'Bộ sưu tập'],
-    ['history', 'Đã đón nhận'],
-    ['settings', 'Cài đặt'],
-  ]
+  const toggleSound = () => {
+    const sound = !g.settings.sound
+    if (sound) {
+      unlockAudio()
+      setTimeout(chime, 60)
+    }
+    void g.updateSettings({ sound })
+  }
 
   return (
     <div className="app">
-      <div className="ambient" aria-hidden="true">
-        <span className="glow glow-emerald" />
-        <span className="glow glow-gold" />
-        <Dust />
-      </div>
+      <Scenery />
 
       <header className="top">
-        <h1 className="wordmark">
-          <Sigil size={15} />
-          <span>The Secret Garden</span>
+        <h1 className="brand">
+          <PixelDiamond size={26} className="brand-gem" />
+          <span className="brand-plate">The Secret Garden</span>
         </h1>
-        <p className="intro">Một khoảng lặng. Một điều biết ơn.</p>
+        <div className="top-actions">
+          <button className="chip" onClick={() => setPanel('collection')} aria-haspopup="dialog">
+            Bộ sưu tập
+          </button>
+          <button
+            className={`chip chip-icon ${g.settings.sound ? 'is-on' : ''}`}
+            onClick={toggleSound}
+            aria-pressed={g.settings.sound}
+            aria-label={g.settings.sound ? 'Tắt âm thanh' : 'Bật âm thanh'}
+          >
+            {g.settings.sound ? <IconSound size={20} /> : <IconMute size={20} />}
+          </button>
+        </div>
       </header>
 
       <Home reduced={reduced} onAddImages={pickFiles} onOpenViewer={setViewerId} />
 
       <nav className="bottom-nav" aria-label="Điều hướng phụ">
-        {nav.map(([key, label]) => (
-          <button key={key} onClick={() => setPanel(key)} aria-haspopup="dialog">
-            {label}
-          </button>
-        ))}
+        <button className="link-chip" onClick={() => setPanel('history')} aria-haspopup="dialog">
+          Đã đón nhận
+        </button>
+        <button className="link-chip" onClick={() => setPanel('settings')} aria-haspopup="dialog">
+          Cài đặt
+        </button>
       </nav>
 
       <input
@@ -162,31 +176,18 @@ function Shell() {
   )
 }
 
-const DUST = Array.from({ length: 16 }, (_, i) => ({
-  left: (i * 37 + 11) % 100,
-  top: (i * 53 + 7) % 100,
-  size: 1 + ((i * 7) % 3) * 0.6,
-  dur: 18 + ((i * 13) % 14),
-  delay: -((i * 5.3) % 20),
-}))
-
-function Dust() {
+/** Nền: trời xanh, tia sáng, mây pixel, biển, cát và cây dừa — chỉ CSS + SVG */
+function Scenery() {
   return (
-    <>
-      {DUST.map((d, i) => (
-        <span
-          key={i}
-          className="dust"
-          style={{
-            left: `${d.left}%`,
-            top: `${d.top}%`,
-            width: d.size,
-            height: d.size,
-            animationDuration: `${d.dur}s`,
-            animationDelay: `${d.delay}s`,
-          }}
-        />
-      ))}
-    </>
+    <div className="scenery" aria-hidden="true">
+      <div className="rays" />
+      <PixelCloud className="cloud cloud-1" />
+      <PixelCloud className="cloud cloud-2" />
+      <PixelCloud className="cloud cloud-3" />
+      <div className="sea" />
+      <div className="sand" />
+      <PixelPalm className="palm palm-l" />
+      <PixelPalm className="palm palm-r" />
+    </div>
   )
 }

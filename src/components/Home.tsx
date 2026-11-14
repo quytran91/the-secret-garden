@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useGarden } from '../store/garden'
 import { chime, haptic, unlockAudio } from '../lib/feedback'
 import { loadOriginal, thumbMosaic, type LoadedOriginal } from '../lib/media'
-import { paintMosaic, sizeCanvas, type Mosaicable } from '../lib/pixel'
+import { paintMosaic, paintPlain, sizeCanvas, type Mosaicable } from '../lib/pixel'
 import { shuffle } from '../lib/bag'
 import {
   anim,
   buildStrip,
+  burst,
   paintIdle,
   REVEAL_STEP_MS,
   REVEAL_STEPS,
@@ -14,7 +15,8 @@ import {
   wait,
 } from './animate'
 import { EmptyCard } from './EmptyCard'
-import { IconExpand, IconHeart } from './Icons'
+import { IconExpand, IconHeart, IconPlus } from './Icons'
+import { PixelDiamond, PixelSpark } from './Pixel'
 
 type Phase = 'idle' | 'drawing' | 'revealed'
 
@@ -42,6 +44,7 @@ export function Home({ reduced, onAddImages, onOpenViewer }: Props) {
   const backRefs = [useRef<HTMLCanvasElement>(null), useRef<HTMLCanvasElement>(null)]
   const backWrapRef = useRef<HTMLDivElement>(null)
   const ctaRef = useRef<HTMLButtonElement>(null)
+  const gateRef = useRef<HTMLDivElement>(null)
 
   const busy = useRef(false)
   const alive = useRef(true)
@@ -116,7 +119,7 @@ export function Home({ reduced, onAddImages, onOpenViewer }: Props) {
         const cv = canvasRef.current
         if (!cv) return
         sizeCanvas(cv)
-        if (phase === 'revealed' && original.current) paintMosaic(cv, original.current.mosaic, { cols: 0, dim: 0 })
+        if (phase === 'revealed' && original.current) paintPlain(cv)
         else if (heroMosaic.current) paintIdle(cv, heroMosaic.current)
         for (const r of backRefs) if (r.current) sizeCanvas(r.current)
         if (phase === 'idle') void paintIdleScene()
@@ -218,13 +221,14 @@ export function Home({ reduced, onAddImages, onOpenViewer }: Props) {
       /* đã decode trước đó */
     }
     hero.style.visibility = ''
+    if (gateRef.current) burst(gateRef.current, reduced)
     await Promise.all([
       anim(img, [{ opacity: 0 }, { opacity: 1 }], ms, 'ease-out'),
       anim(glow, [{ opacity: 0 }, { opacity: 1 }], ms + 200, "ease-out"),
       reduced ? Promise.resolve() : anim(hero, [{ transform: hero.style.transform || 'scale(1)' }, { transform: 'scale(1)' }], ms + 260),
     ])
     sizeCanvas(cv)
-    paintMosaic(cv, o.mosaic, { cols: 0, dim: 0 })
+    paintPlain(cv)
   }
 
   /* ---------- Bốc ---------- */
@@ -399,19 +403,39 @@ export function Home({ reduced, onAddImages, onOpenViewer }: Props) {
 
   const showComplete = roundComplete && phase === 'idle'
 
-  const countLine = useMemo(() => {
-    if (settings.mode === 'free') return `Ngẫu nhiên tự do · ${count} ảnh`
-    if (!bag) return ''
-    if (bag.remaining.length === 0) return `Bạn đã mở trọn vòng ${bag.round}`
-    return `Còn ${bag.remaining.length} ảnh chưa mở trong vòng ${bag.round}`
+  const progress = useMemo(() => {
+    if (settings.mode === 'free') return { text: `Ngẫu nhiên tự do · ${count} thông điệp`, ratio: null as number | null }
+    if (!bag) return { text: '', ratio: 0 }
+    const opened = bag.drawn.length
+    const total = opened + bag.remaining.length
+    const round = bag.round > 1 ? ` · vòng ${bag.round}` : ''
+    return { text: `Đã mở ${opened} / ${total} thông điệp${round}`, ratio: total ? opened / total : 0 }
   }, [settings.mode, bag, count])
+
+  const intro = (lead: string) => (
+    <div className="board-intro">
+      <span className="pill">★ Món quà đang chờ bạn ★</span>
+      <h2 className="game-title">
+        <span className="t1">Mở khoá</span>
+        <span className="t2">Thông điệp</span>
+      </h2>
+      <p className="lead">{lead}</p>
+    </div>
+  )
 
   if (status === 'loading') {
     return (
       <main className="home" aria-busy="true">
-        <div className="stage">
-          <div className="hero-card is-loading" aria-label="Đang mở khu vườn" />
-        </div>
+        <section className="board">
+          {intro('Đang mở kho báu…')}
+          <div className="board-stage">
+            <div className="gate">
+              <div className="gate-inner">
+                <div className="hero-card is-loading" aria-label="Đang tải" />
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
     )
   }
@@ -419,13 +443,14 @@ export function Home({ reduced, onAddImages, onOpenViewer }: Props) {
   if (status === 'error') {
     return (
       <main className="home">
-        <div className="notice-block" role="alert">
-          <h2 className="title-serif">Khu vườn chưa mở được</h2>
+        <section className="board board-notice" role="alert">
+          <PixelDiamond size={56} />
+          <h2 className="game-title game-title-sm">Kho báu chưa mở được</h2>
           <p>
             Trình duyệt đang chặn bộ nhớ cục bộ (IndexedDB) — thường do chế độ duyệt riêng tư. Hãy mở bằng cửa sổ
             thường rồi tải lại trang.
           </p>
-        </div>
+        </section>
       </main>
     )
   }
@@ -433,16 +458,24 @@ export function Home({ reduced, onAddImages, onOpenViewer }: Props) {
   if (count === 0) {
     return (
       <main className="home">
-        <div className="stage">
-          <EmptyCard />
-        </div>
-        <div className="controls">
-          <h2 className="title-serif empty-title">Những món quà của bạn bắt đầu từ đây</h2>
-          <p className="muted small center">Nạp những ảnh thông điệp của riêng bạn — lời biết ơn, gia đình, kỷ niệm, mong ước.</p>
-          <button className="btn btn-primary" onClick={onAddImages}>
-            Thêm ảnh của bạn
-          </button>
-        </div>
+        <section className="board board-empty">
+          <div className="board-stage">
+            <div className="gate">
+              <div className="gate-inner">
+                <EmptyCard />
+              </div>
+            </div>
+          </div>
+          <div className="controls">
+            <h2 className="game-title game-title-sm empty-title">Kho báu của bạn đang chờ được lấp đầy</h2>
+            <p className="lead center">
+              Trong thư viện ảnh, chạm chọn nhiều tấm cùng lúc rồi bấm Thêm.
+            </p>
+            <button className="btn btn-primary" onClick={onAddImages}>
+              Thêm ảnh của bạn
+            </button>
+          </div>
+        </section>
       </main>
     )
   }
@@ -450,88 +483,123 @@ export function Home({ reduced, onAddImages, onOpenViewer }: Props) {
   const revealed = phase === 'revealed' && !!resultMeta
   return (
     <main className={`home phase-${phase}`}>
-      <p className={`stage-caption ${revealed ? 'is-on' : ''}`} aria-live="polite">
-        {revealed ? 'Thông điệp dành cho bạn' : phase === 'drawing' ? (waiting ? 'Đang mở món quà…' : ' ') : ' '}
-      </p>
-      <div className="stage">
-        <div className="back-stack" ref={backWrapRef} aria-hidden="true" hidden={showComplete}>
-          <div className="back-card back-1">
-            <canvas ref={backRefs[0]} />
-          </div>
-          <div className="back-card back-2">
-            <canvas ref={backRefs[1]} />
-          </div>
-        </div>
-        <div className="strip" ref={stripRef} aria-hidden="true" />
-        {showComplete ? (
-          <div className="hero-card complete-card">
-            <div className="complete-inner">
-              <span className="eyebrow">Trọn một vòng</span>
-              <h2 className="title-serif">Bạn đã đón nhận tất cả những món quà của vòng này.</h2>
-              <p className="muted">Cảm ơn bạn đã dành thời gian cho những điều quý giá.</p>
-            </div>
-          </div>
-        ) : (
-          <div
-            className={`hero-card ${revealed ? 'is-revealed' : ''}`}
-            ref={heroRef}
-            role={revealed ? 'button' : undefined}
-            tabIndex={revealed ? 0 : -1}
-            aria-label={revealed ? `Xem lớn: ${resultMeta?.name}` : 'Món quà đang được che kín'}
-            onClick={() => revealed && resultId && onOpenViewer(resultId)}
-            onKeyDown={(e) => {
-              if (revealed && resultId && (e.key === 'Enter' || e.key === ' ')) {
-                e.preventDefault()
-                onOpenViewer(resultId)
-              }
-            }}
-          >
-            <canvas ref={canvasRef} className="hero-canvas" aria-hidden="true" />
-            <img ref={imgRef} className="hero-img" alt="" draggable={false} />
-            <div ref={glowRef} className="hero-glow" aria-hidden="true" />
-          </div>
-        )}
-      </div>
+      <section className="board">
+        {intro(revealed ? 'Dành một nhịp thở để cảm nhận điều này.' : 'Chạm để đón nhận một điều biết ơn.')}
 
-      <div className="controls">
-        {revealed ? (
-          <>
-            <p className="breath">Dành một nhịp thở để cảm nhận điều này.</p>
-            <div className="result-actions">
-              <button
-                className={`btn btn-ghost btn-icon-text ${resultMeta?.favorite ? 'is-active' : ''}`}
-                aria-pressed={!!resultMeta?.favorite}
-                onClick={() => resultId && g.toggleFavorite(resultId)}
-              >
-                <IconHeart size={18} filled={!!resultMeta?.favorite} />
-                <span>Yêu thích</span>
-              </button>
-              <button className="btn btn-ghost btn-icon-text" onClick={() => resultId && onOpenViewer(resultId)}>
-                <IconExpand size={18} />
-                <span>Xem toàn ảnh</span>
-              </button>
+        <div className="board-stage">
+          <div className={`gate ${revealed ? 'is-revealed' : ''}`} ref={gateRef}>
+            <PixelDiamond size={34} className="gate-gem" />
+            <span className={`ribbon ${revealed ? 'is-on' : ''}`} aria-live="polite">
+              {revealed ? 'Món quà dành cho bạn' : ''}
+            </span>
+            <PixelDiamond size={18} className="corner corner-tl" />
+            <PixelDiamond size={18} className="corner corner-tr" />
+            <PixelDiamond size={18} className="corner corner-bl" />
+            <PixelDiamond size={18} className="corner corner-br" />
+            <div className="gate-inner">
+              <div className="back-stack" ref={backWrapRef} aria-hidden="true" hidden={showComplete}>
+                <div className="back-card back-1">
+                  <canvas ref={backRefs[0]} />
+                </div>
+                <div className="back-card back-2">
+                  <canvas ref={backRefs[1]} />
+                </div>
+              </div>
+              <div className="strip" ref={stripRef} aria-hidden="true" />
+              {showComplete ? (
+                <div className="hero-card complete-card">
+                  <div className="complete-inner">
+                    <PixelDiamond size={64} />
+                    <span className="pill pill-blue">Trọn một vòng</span>
+                    <p className="complete-title">Bạn đã mở hết kho báu của vòng này!</p>
+                    <p className="small">Cảm ơn bạn đã dành thời gian cho những điều quý giá.</p>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className={`hero-card ${revealed ? 'is-revealed' : ''}`}
+                  ref={heroRef}
+                  role={revealed ? 'button' : undefined}
+                  tabIndex={revealed ? 0 : -1}
+                  aria-label={revealed ? `Xem lớn: ${resultMeta?.name}` : 'Món quà đang được che kín'}
+                  onClick={() => revealed && resultId && onOpenViewer(resultId)}
+                  onKeyDown={(e) => {
+                    if (revealed && resultId && (e.key === 'Enter' || e.key === ' ')) {
+                      e.preventDefault()
+                      onOpenViewer(resultId)
+                    }
+                  }}
+                >
+                  <canvas ref={canvasRef} className="hero-canvas" aria-hidden="true" />
+                  <img ref={imgRef} className="hero-img" alt="" draggable={false} />
+                  <div ref={glowRef} className="hero-glow" aria-hidden="true" />
+                </div>
+              )}
             </div>
-            <button ref={ctaRef} className="btn btn-primary" onClick={draw}>
-              Đón nhận thêm
+            <div className="gate-flash" aria-hidden="true" />
+            <div className="gate-rays" aria-hidden="true">
+              {Array.from({ length: 12 }, (_, i) => (
+                <span key={i} style={{ '--a': `${i * 30 + 15}deg` } as CSSProperties}>
+                  <PixelSpark />
+                </span>
+              ))}
+            </div>
+          </div>
+          {phase === 'drawing' && waiting && <p className="wait-note">Đang mở món quà…</p>}
+        </div>
+
+        <div className="controls">
+          <div className="progress-row">
+            <p className="count-line">{progress.text}</p>
+            {progress.ratio !== null && (
+              <div className="pixel-bar" aria-hidden="true">
+                <span style={{ transform: `scaleX(${progress.ratio})` }} />
+              </div>
+            )}
+          </div>
+          {revealed ? (
+            <>
+              <button ref={ctaRef} className="btn btn-primary" onClick={draw}>
+                Đón nhận thêm
+              </button>
+              <div className="result-actions">
+                <button
+                  className={`btn btn-ghost btn-icon-text ${resultMeta?.favorite ? 'is-active' : ''}`}
+                  aria-pressed={!!resultMeta?.favorite}
+                  onClick={() => resultId && g.toggleFavorite(resultId)}
+                >
+                  <IconHeart size={18} filled={!!resultMeta?.favorite} />
+                  <span>Yêu thích</span>
+                </button>
+                <button className="btn btn-ghost btn-icon-text" onClick={() => resultId && onOpenViewer(resultId)}>
+                  <IconExpand size={18} />
+                  <span>Xem toàn ảnh</span>
+                </button>
+              </div>
+            </>
+          ) : showComplete ? (
+            <button ref={ctaRef} className="btn btn-primary" onClick={onNewRound}>
+              Bắt đầu vòng mới
             </button>
-          </>
-        ) : showComplete ? (
-          <button ref={ctaRef} className="btn btn-primary" onClick={onNewRound}>
-            Bắt đầu vòng mới
-          </button>
-        ) : (
-          <button
-            ref={ctaRef}
-            className="btn btn-primary"
-            onClick={draw}
-            disabled={phase === 'drawing'}
-            aria-busy={phase === 'drawing'}
-          >
-            {phase === 'drawing' ? 'Đang đón nhận…' : 'Đón nhận thông điệp'}
-          </button>
-        )}
-        <p className="count-line">{countLine}</p>
-      </div>
+          ) : (
+            <>
+              <button
+                ref={ctaRef}
+                className="btn btn-primary"
+                onClick={draw}
+                disabled={phase === 'drawing'}
+                aria-busy={phase === 'drawing'}
+              >
+                {phase === 'drawing' ? 'Đang mở…' : 'Đón nhận thông điệp'}
+              </button>
+              <button className="btn btn-ghost btn-sm add-btn" onClick={onAddImages} disabled={phase === 'drawing'}>
+                <IconPlus size={18} />
+                <span>Thêm ảnh</span>
+              </button>
+            </>
+          )}
+        </div>
+      </section>
     </main>
   )
 }

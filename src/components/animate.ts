@@ -140,3 +140,11 @@ export const REVEAL_STEPS: { cols: number; dim: number }[] = [
   { cols: 96, dim: 0.07 },
 ]
 export const REVEAL_STEP_MS = 215
+
+/** Đợt sáng vàng ngắn + tia sáng pixel quanh khung khi ảnh mở. Nhẹ, không chớp mạnh. */
+export function burst(gate: HTMLElement, reduced: boolean) {
+  gate.classList.remove('is-burst', 'is-burst-soft')
+  void gate.offsetWidth
+  gate.classList.add(reduced ? 'is-burst-soft' : 'is-burst')
+  window.setTimeout(() => gate.classList.remove('is-burst', 'is-burst-soft'), 1400)
+}

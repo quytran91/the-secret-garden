@@ -80,3 +80,16 @@ export const Sigil = (p: P) => (
     <path d="M6 8.5h12M9 5l3 14M15 5l-3 14" opacity={0.6} />
   </Svg>
 )
+
+export const IconSound = (p: P) => (
+  <Svg {...p} strokeWidth={2}>
+    <path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4v-5Z" />
+    <path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" />
+  </Svg>
+)
+export const IconMute = (p: P) => (
+  <Svg {...p} strokeWidth={2}>
+    <path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4v-5Z" />
+    <path d="m16 9.5 5 5M21 9.5l-5 5" />
+  </Svg>
+)

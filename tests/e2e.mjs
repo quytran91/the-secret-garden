@@ -164,7 +164,7 @@ async function drawOnce(label) {
 /* ================= Kịch bản ================= */
 await page.goto(BASE, { waitUntil: 'networkidle0' })
 await page.waitForSelector('.home')
-ok('Trạng thái trống hiển thị tiêu đề và CTA', await page.evaluate(() => document.body.innerText.includes('Những món quà của bạn bắt đầu từ đây') && document.body.innerText.includes('Thêm ảnh của bạn')))
+ok('Trạng thái trống hiển thị tiêu đề và CTA', await page.evaluate(() => document.body.innerText.includes('Kho báu của bạn đang chờ được lấp đầy') && document.body.innerText.includes('Thêm ảnh của bạn')))
 await shot('01-empty-mobile')
 
 // Nhập ảnh: 6 hợp lệ (dọc, ngang, vuông; JPEG/PNG/WebP) + trùng + hỏng + HEIC + GIF
@@ -191,7 +191,7 @@ await closeSheet()
 
 await page.reload({ waitUntil: 'networkidle0' })
 await page.waitForSelector('.count-line')
-ok('Reload: ảnh vẫn còn', (await state()).images === 6 && (await page.$eval('.count-line', (e) => e.innerText)).includes('Còn 6 ảnh'))
+ok('Reload: ảnh vẫn còn', (await state()).images === 6 && (await page.$eval('.count-line', (e) => e.innerText)).includes('Đã mở 0 / 6 thông điệp'))
 await sleep(400)
 await shot('03-idle-mobile')
 
@@ -207,6 +207,8 @@ await waitRevealed()
 await sleep(300)
 await shot('05-revealed')
 const first = await state()
+ok('Hiện nhãn "Món quà dành cho bạn" khi mở', (await page.$eval('.ribbon', (e) => e.textContent)) === 'Món quà dành cho bạn')
+ok('Tiến độ lấy từ dữ liệu thật', (await page.$eval('.count-line', (e) => e.innerText)).includes('Đã mở 1 / 6 thông điệp'))
 
 // Bốc hết vòng
 const names = [first.lockedName]
@@ -230,7 +232,7 @@ ok('Hết vòng: hiện lời chúc và "Bắt đầu vòng mới"', (await page
 await shot('06-round-complete')
 ;(await cta()).click()
 await sleep(400)
-ok('Vòng mới đủ 6 ảnh', (await page.$eval('.count-line', (e) => e.innerText)).includes('Còn 6 ảnh chưa mở trong vòng 2'))
+ok('Vòng mới đủ 6 ảnh', (await page.$eval('.count-line', (e) => e.innerText)).includes('Đã mở 0 / 6 thông điệp · vòng 2'))
 
 // Bấm liên tục
 const h0 = (await state()).history
@@ -263,7 +265,7 @@ const added = await state()
 ok('Thêm ảnh giữa vòng: vào nhóm chưa mở', added.bag.remaining.length === before + 1 && added.images === 7)
 
 // Xoá ảnh đang hiển thị qua giao diện (có xác nhận)
-await page.evaluate(() => [...document.querySelectorAll('.bottom-nav button')].find((b) => b.innerText === 'Bộ sưu tập').click())
+await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.innerText.trim() === 'Bộ sưu tập').click())
 await sleep(600)
 await shot('07-collection')
 const lockedBeforeDelete = (await state()).current.imageId
@@ -282,12 +284,12 @@ await closeSheet()
 ok('Xoá ảnh đang mở: quay về trạng thái chờ', (await phase()).includes('phase-idle'))
 
 // Lịch sử + cài đặt
-await page.evaluate(() => [...document.querySelectorAll('.bottom-nav button')].find((b) => b.innerText === 'Đã đón nhận').click())
+await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.innerText.trim() === 'Đã đón nhận').click())
 await sleep(600)
 ok('Lịch sử nhóm theo ngày', (await page.$eval('.sheet-body', (e) => e.textContent)).includes('Hôm nay'))
 await shot('09-history')
 await closeSheet()
-await page.evaluate(() => [...document.querySelectorAll('.bottom-nav button')].find((b) => b.innerText === 'Cài đặt').click())
+await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.innerText.trim() === 'Cài đặt').click())
 await sleep(600)
 await shot('10-settings')
 await closeSheet()
